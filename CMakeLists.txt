@@ -67,13 +67,13 @@
 # 2013-11-05 PH added support for PARENS_NEST_LIMIT
 # 2016-03-01 PH applied Chris Wilson's patch for MSVC static build
 # 2016-06-24 PH applied Chris Wilson's revised patch (adds a separate option)
+CMAKE_MINIMUM_REQUIRED(VERSION 3.16)
 
-PROJECT(PCRE C CXX)
+PROJECT(PCRE VERSION 8.43 LANGUAGES C CXX)
 
 # Increased minimum to 2.8.0 to support newer add_test features. Set policy
 # CMP0026 to avoid warnings for the use of LOCATION in GET_TARGET_PROPERTY.
 
-CMAKE_MINIMUM_REQUIRED(VERSION 2.8.0)
 CMAKE_POLICY(SET CMP0026 OLD)
 
 SET(CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake) # for FindReadline.cmake
@@ -626,6 +626,10 @@ SET(targets ${targets} pcre)
 ADD_LIBRARY(pcreposix ${PCREPOSIX_HEADERS} ${PCREPOSIX_SOURCES})
 SET(targets ${targets} pcreposix)
 TARGET_LINK_LIBRARIES(pcreposix pcre)
+IF(NOT BUILD_SHARED_LIBS)
+  TARGET_COMPILE_DEFINITIONS(pcre INTERFACE PCRE_STATIC)
+  TARGET_COMPILE_DEFINITIONS(pcreposix INTERFACE PCRE_STATIC)
+ENDIF(NOT BUILD_SHARED_LIBS)
 
 IF(MINGW AND NOT PCRE_STATIC)
   IF(NON_STANDARD_LIB_PREFIX)
@@ -688,6 +692,9 @@ IF(PCRE_BUILD_PCRECPP)
 ADD_LIBRARY(pcrecpp ${PCRECPP_HEADERS} ${PCRECPP_SOURCES})
 SET(targets ${targets} pcrecpp)
 TARGET_LINK_LIBRARIES(pcrecpp pcre)
+IF(NOT BUILD_SHARED_LIBS)
+  TARGET_COMPILE_DEFINITIONS(pcrecpp INTERFACE PCRE_STATIC)
+ENDIF(NOT BUILD_SHARED_LIBS)
 
   IF(MINGW AND NOT PCRE_STATIC)
     IF(NON_STANDARD_LIB_PREFIX)
@@ -885,10 +892,43 @@ ENDIF(PCRE_BUILD_TESTS)
 # Installation
 SET(CMAKE_INSTALL_ALWAYS 1)
 
-INSTALL(TARGETS ${targets}
+include(CMakePackageConfigHelpers)
+write_basic_package_version_file(
+  ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}-config-version.cmake
+  VERSION ${PROJECT_VERSION}
+  COMPATIBILITY AnyNewerVersion
+)
+
+INSTALL(TARGETS pcre EXPORT pcre
         RUNTIME DESTINATION bin
         LIBRARY DESTINATION lib
-        ARCHIVE DESTINATION lib)
+        ARCHIVE DESTINATION lib
+        INCLUDES DESTINATION include)
+INSTALL(TARGETS pcrecpp EXPORT pcre
+        RUNTIME DESTINATION bin
+        LIBRARY DESTINATION lib
+        ARCHIVE DESTINATION lib
+        INCLUDES DESTINATION include)
+INSTALL(TARGETS pcreposix EXPORT pcre
+        RUNTIME DESTINATION bin
+        LIBRARY DESTINATION lib
+        ARCHIVE DESTINATION lib
+        INCLUDES DESTINATION include
+)
+
+install(EXPORT pcre
+  NAMESPACE
+    ${PROJECT_NAME}::
+  DESTINATION
+    lib/cmake/${PROJECT_NAME}
+)
+
+install(FILES
+  cmake/${PROJECT_NAME}-config.cmake
+  ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}-config-version.cmake
+  DESTINATION
+    lib/cmake/${PROJECT_NAME}
+)
 
 INSTALL(FILES ${PCRE_HEADERS} ${PCREPOSIX_HEADERS} DESTINATION include)
 
@@ -909,19 +949,30 @@ ELSE(PCRE_BUILD_PCRECPP)
         SET(man3 ${man3_new})
 ENDIF(PCRE_BUILD_PCRECPP)
 
-INSTALL(FILES ${man1} DESTINATION man/man1)
-INSTALL(FILES ${man3} DESTINATION man/man3)
-INSTALL(FILES ${html} DESTINATION share/doc/pcre/html)
+# INSTALL(FILES ${man1} DESTINATION man/man1)
+# INSTALL(FILES ${man3} DESTINATION man/man3)
+# INSTALL(FILES ${html} DESTINATION share/doc/pcre/html)
 
 IF(MSVC AND INSTALL_MSVC_PDB)
-    INSTALL(FILES ${PROJECT_BINARY_DIR}/pcre.pdb
-                  ${PROJECT_BINARY_DIR}/pcreposix.pdb
-            DESTINATION bin
-            CONFIGURATIONS RelWithDebInfo)
-    INSTALL(FILES ${PROJECT_BINARY_DIR}/pcred.pdb
-                  ${PROJECT_BINARY_DIR}/pcreposixd.pdb
-            DESTINATION bin
-            CONFIGURATIONS Debug)
+    set_target_properties(pcre PROPERTIES COMPILE_PDB_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR} COMPILE_PDB_NAME pcre COMPILE_PDB_NAME_DEBUG pcred)
+    target_compile_options(pcre PRIVATE /sdl- /MP)
+    target_link_options(pcre PRIVATE /INCREMENTAL:NO /debug:full)
+    set_target_properties(pcrecpp PROPERTIES COMPILE_PDB_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR} COMPILE_PDB_NAME pcrecpp COMPILE_PDB_NAME_DEBUG pcrecppd)
+    target_compile_options(pcrecpp PRIVATE /sdl- /MP)
+    target_link_options(pcrecpp PRIVATE /INCREMENTAL:NO /debug:full)
+    set_target_properties(pcreposix PROPERTIES COMPILE_PDB_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR} COMPILE_PDB_NAME pcreposix COMPILE_PDB_NAME_DEBUG pcreposixd)
+    target_compile_options(pcreposix PRIVATE /sdl- /MP)
+    target_link_options(pcreposix PRIVATE /INCREMENTAL:NO /debug:full)
+    INSTALL(FILES ${PROJECT_BINARY_DIR}/RelWithDebInfo/pcre.pdb
+                  ${PROJECT_BINARY_DIR}/RelWithDebInfo/pcrecpp.pdb
+                  ${PROJECT_BINARY_DIR}/RelWithDebInfo/pcreposix.pdb
+            DESTINATION lib
+             CONFIGURATIONS RelWithDebInfo)
+    INSTALL(FILES ${PROJECT_BINARY_DIR}/Debug/pcred.pdb
+                  ${PROJECT_BINARY_DIR}/Debug/pcrecppd.pdb
+                  ${PROJECT_BINARY_DIR}/Debug/pcreposixd.pdb
+            DESTINATION lib
+             CONFIGURATIONS Debug)
 ENDIF(MSVC AND INSTALL_MSVC_PDB)
 
 # help, only for nice output

@@ -55,3 +55,4 @@ pcregrep
 /testtry
 /test-driver
 /*.trs
+build*/
