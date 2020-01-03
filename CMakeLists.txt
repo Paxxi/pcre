@@ -67,7 +67,7 @@
 # 2013-11-05 PH added support for PARENS_NEST_LIMIT
 # 2016-03-01 PH applied Chris Wilson's patch for MSVC static build
 # 2016-06-24 PH applied Chris Wilson's revised patch (adds a separate option)
-CMAKE_MINIMUM_REQUIRED(VERSION 3.16)
+CMAKE_MINIMUM_REQUIRED(VERSION 3.15)
 
 PROJECT(PCRE VERSION 8.43 LANGUAGES C CXX)
 
